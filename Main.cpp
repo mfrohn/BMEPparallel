@@ -25,16 +25,16 @@ using namespace ::dashoptimization;
 
 /* DEFINITIONS & CONSTANTS */
 #define CURRENTVERSION 	   "7.14 - Golden Master"
-#define CURRENTVERSIONDATE "July 10 2022"
+#define CURRENTVERSIONDATE "December 12 2022"
 
 #define MIN(X, Y) (((X) <= (Y)) ? (X) : (Y))
 #define MAX(X, Y) (((X) >= (Y)) ? (X) : (Y))
 
-#define MAX_INT    0x7FFFFFFF			//int infinity 
-#define MAX_DOUBLE 0x1.FFFFFFFFFFFFFP+1023	//double infinity 
-#define INF 	   MAX_DOUBLE			//infinity - it is set to the double one  
-#define MAX_TIME   3600				//maximum running time to be considered 1h 
-//#define MAX_TIME   -1				//no max running time
+#define MAX_INT    0x7FFFFFFF					//int infinity 
+#define MAX_DOUBLE 0x1.FFFFFFFFFFFFFP+1023		//double infinity 
+#define INF 	   MAX_DOUBLE					//infinity - it is set to the double one  
+#define MAX_TIME   3600						//maximum running time to be considered 1h 
+//#define MAX_TIME   -1							//no max running time
 #define PRECISION  16                           //output precision
 #define MAX_TOLL   0.0000000001                 //10^-10
 
@@ -45,9 +45,10 @@ const int numWidth      = 25;
 const int numWidth2     = 12;
 double TOLL=1;
 double EPS=0.5;
+bool PRINT_TAU=true;
 
 /* Global variables */
-mutex m; 					// Global locker for mutual exclusive access to data
+mutex m; 											 // Global locker for mutual exclusive access to data
 
 struct EDGE{
 	int i; 
@@ -57,14 +58,14 @@ struct EDGE{
 };
 
 struct OPTIMUM_STRUCT{
-	double tree_len;					//Length of the best so far tree 
-	vector <struct EDGE> tree; 				//Best so far tree encoded as a list of edges
-	long long OverallNumber_of_Primal_Solutions;	 	//...
+	double tree_len;								 //Length of the best so far tree 
+	vector <struct EDGE> tree; 						 //Best so far tree encoded as a list of edges
+	long long OverallNumber_of_Primal_Solutions;	 //...
 	vector <vector <struct EDGE> > primal_bound_list;
 	int core;
 };
 
-OPTIMUM_STRUCT Optimum;  		  			//Global Optimum
+OPTIMUM_STRUCT Optimum;  		  					 //Global Optimum
 
 struct NODE{
 	vector <struct EDGE> partial_tree;  
@@ -85,51 +86,50 @@ struct CompareNodes{
 priority_queue<NODE,vector<NODE>,CompareNodes> Queue; 
 
 struct STATS{
-	bool      outoftime;		/* Check if the algorithm is running out of time   	*/
-	long long nodecounter;		/* B&B Node Counter					*/	
-	long long int_sol_counter;	/* Integer solution counter    				*/
-	long long LPCounter;      	/* LP calls executed 				 	*/
-	long long DualCounter;      	/* Dual calls executed 					*/
-	double    PardiRootLB;		/* Pardi's alpha root lower bound 			*/
-	double    PardiGammaRootLB;	/* Pardi's gamma root lower bound 			*/
-	double    KraftRootLB;		/* Formulation 2 root lower bound			*/
-	double    ManifoldRootLB;	/* Formulation 3 root lower bound			*/
-	double    LPRootLB;		/* Formulation 4 root lower bound 			*/
-	double    RootLB;		/* Root LB: LP or Pardi depending on bound type 	*/
-	double    RootUB;		/* Root upper bound 				 	*/
-	double    GAP;		  	/* Root Gap     				   	*/
-	double 	  start_time;       	/* start time (sec) of the global search		*/
-	double    end_time;         	/* end time (sec) of the global search			*/
-	bool	  core_runnnig;     	/* Specifies if the core is idle or running    		*/
+	bool      outoftime;		/* Check if the algorithm is running out of time   */
+	long long nodecounter;		/*        		  B&B Node Counter				 */	
+	long long int_sol_counter;	/*     		 Integer solution counter    		 */
+	long long LPCounter;      	/*  			   LP calls executed 				 */
+	long long DualCounter;      /*  			   Dual calls executed 				 */
+	double    PardiRootLB;		/*  		    Pardi's root lower bound 			 */
+	double    PardiGammaRootLB;
+	double    ManifoldRootLB;
+	double    KraftRootLB;
+	double    LPRootLB;			/*  			 LP root lower bound 				 */
+	double    RootLB;			/* Root LB: LP or Pardi depending on bound type 	 */
+	double    RootUB;			/*  			   Root upper bound 				 */
+	double    GAP;		  		/*			  	  Root Gap     				   	 */
+	double 	  start_time;       /*  start time (sec) of the global search			 */
+	double    end_time;         /*  	end time (sec) of the global search			 */
+	bool	  core_runnnig;     /*     Specifies if the core is idle or running    */
 };
 
 int 	  boundtype=2;			/*  1: Pardi's one; 2: LP + Lagrangian; */
-double  **dist=NULL;			/*  Distance Matrix Pointer 		*/ 	
+double  **dist=NULL;			/*  Distance Matrix Pointer */ 	
 STATS    *StatsArray=NULL; 	 	/*  Statistics array, one entry per core. By default, core 0 stores RootLB and UB */
 
-double   *precomputedpow;       	/*  precomputed powers 2^-k  		*/
-double   *precomputedpowRes;     	/*  precomputed powers 2^-k/res_factor  */
+double   *precomputedpow;       /*  precomputed powers 2^-k  */
+double   *precomputedpowRes;     /*  precomputed powers 2^-k/res_factor  */
 double    res_factor = 1.2446;
 bool 	  obj_rescaling=false;
-double 	 *beta=NULL;	   	    	/*  Pardi's beta_k vector		       */	
-double  **beta_all=NULL; 		/*  Pardi's beta vector (for gamma bound only) */
+double 	 *beta=NULL;	   	    /*  Pardi's beta_k vector	*/	
+double  **beta_all=NULL; 
 double   *bgamma=NULL;
-int 	  verbose=1;            	/*  Control how much output to write in the console */
-long 	  OverallCoreNumber;		/*  Overall number of cores available in the machine */
+int 	  verbose=1;            /*  Control how much output to write in the console */
+long 	  OverallCoreNumber;	/*  Overall number of cores available in the machine */
 
-// entropy lower bound information
-double    opt_alpha=-1;			
+double    opt_alpha=-1;
 double    opt_entropybound=-MAX_DOUBLE;
 double    K=0.0;
 
-int	  readingPattern=1;
+int				readingPattern=1;
 double    bestPrimal;
 bool      readtree=false;
-bool 	  output_for_experiment=true;
+bool 	    output_for_experiment=true;
 int       torder=0,eorder=0,qrule=3,n_p=3,s_p=2;
 string    namefile;
 string    namefile2;
-double    user_max_time = 3599;
+double    user_max_time = MAX_TIME;
 
 //bool Out_of_Time(){if(user_max_time == MAX_TIME) return false; else return (omp_get_wtime()-StatsArray[0].start_time > user_max_time) ? true : false;}
 bool Out_of_Time(){return (omp_get_wtime()-StatsArray[0].start_time > user_max_time) ? true : false;}
@@ -154,6 +154,7 @@ void Precompute_Pardi_Beta_Array(register unsigned int n){
 	 			counter++;
   	  	beta_all[k][counter]=dist[i][k]+dist[j][k]-dist[i][j];
 	 		}
+	 	//cout << "beta["<<k<<"] = "<<beta[k]<<endl;
 	 	// sort beta_all[k] non-decreasing
   	for(int i=1; i<=counter-1; i++){
 			int min_idx = i;
@@ -162,6 +163,8 @@ void Precompute_Pardi_Beta_Array(register unsigned int n){
 			while(min_idx > i){beta_all[k][min_idx]=beta_all[k][min_idx-1]; min_idx--;}
 			beta_all[k][i]=min;
 		} 	
+		/*for(int i=1; i<=counter; i++)
+			cout << beta_all[k][i] << " "; cout << endl;*/
 		bgamma[k]=0.0;
 		for(register unsigned int i=1; i<=k-3; i++) 
 			bgamma[k]+=beta_all[k][i]*precomputedpow[n-1-i];
@@ -183,6 +186,8 @@ void GlobalSearch(int n, int core){
 			if(Queue.empty()==true && AllIdleCores(OverallCoreNumber)==true) break;
 		}
 		else{
+			// #pragma omp critical
+			// cout<<"Runtime limit reached for core "<<core<<". Going in idle status."<<endl;
 			break;	
 		}	
 	}
@@ -207,6 +212,7 @@ void Initializer_and_Terminator(char * const datafile, int taxa, bool DSrescalin
 		TOLL=MAX_TOLL;
 		cout<<"Setting tolerance to "<<TOLL<<endl;	
 		IH->StabilityChecker(n,dist);
+		//cout << "+++ " << namefile << " n = " << n << endl;
 		if(DSrescaling)IH->ActivateEntropyAnalysis=true;
 		if(IH->ActivateEntropyAnalysis)IH->EntropyAnalysis(n,dist,DSrescaling);	
 	}
@@ -387,7 +393,7 @@ void Initializer_and_Terminator(char * const datafile, int taxa, bool DSrescalin
 		else{
 			OutputHandler *OHandler = new OutputHandler(n);
 			//OHandler->ComputeD3Hierarchy(Optimum.tree,namefile);
-			//OHandler->OutputPrimalBoundList(Optimum.primal_bound_list,namefile);
+			OHandler->OutputPrimalBoundList(Optimum.primal_bound_list,namefile);
 			//OHandler->OutputSpectralAnalysis(Optimum.primal_bound_list,dist);
 			delete OHandler;
 		}	

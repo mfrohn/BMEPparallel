@@ -117,6 +117,14 @@ public:
 			current_leafset=0;
 			for(int child=1; child<=3; child++) if(M[node1-n][child]!=node2) {current_leafset++; getLeafset(M[node1-n][child],node1);}
 			for(int child=1; child<=3; child++) if(M[node2-n][child]!=node1) {current_leafset++; getLeafset(M[node2-n][child],node2);}
+			// Print partition
+			/*cout << endl;
+			cout << "Partition by edge (" << node1 << "," << node2 << "):" << endl;
+			for(int i=1;i<=n_leaves[1];i++) cout << partition_leaves[1][i] << ", "; cout << endl;
+			for(int i=1;i<=n_leaves[2];i++) cout << partition_leaves[2][i] << ", "; cout << endl;
+			for(int i=1;i<=n_leaves[3];i++) cout << partition_leaves[3][i] << ", "; cout << endl;
+			for(int i=1;i<=n_leaves[4];i++) cout << partition_leaves[4][i] << ", "; cout << endl;
+			cout << endl;*/
 			// calculate edge weight
 			double weight=0.0;
 			for(int i=1;i<=n_leaves[1];i++){
@@ -129,6 +137,7 @@ public:
 			}
 			for(int i=1;i<=n_leaves[1];i++)for(int j=1;j<=n_leaves[2];j++) weight-=dist[partition_leaves[1][i]][partition_leaves[2][j]]*pow(2,scale_factor-Tau[partition_leaves[1][i]][partition_leaves[2][j]]+1);
 			for(int i=1;i<=n_leaves[3];i++)for(int j=1;j<=n_leaves[4];j++) weight-=dist[partition_leaves[3][i]][partition_leaves[4][j]]*pow(2,scale_factor-Tau[partition_leaves[3][i]][partition_leaves[4][j]]+1);
+			//cout << "edge weight for internal edge: " << weight << endl;
 			return weight;
 		}
 	}
@@ -136,6 +145,10 @@ public:
 	void ComputeD3Hierarchy(vector <struct EDGE>tree, string namefile){
 		cout<<"\nGenerating a visual representation of the optimal solution...";
 		ComputeAdjacents(tree);
+		// for(int i=1; i<=n-2; i++){
+		// 	cout<<i+n<<":\t";
+		// 	for(int j=1; j<=3; j++) cout<<M[i][j]<<"\t"; cout<<endl;
+		// }
 		out.open("treeData.txt");
 		out<<"\n\n\n"<<endl;
 		out<<"var treeData =[{"<<endl;
@@ -165,14 +178,14 @@ public:
 		}	
 		register int CurrentNode,VisitedNode; 
 		double len=0;
-		Tau[0][0] = 0; 
+		Tau[0][0] = 0; // Modified 2/6/2009
 		for(register unsigned int j=0; j<tsize; j++){
 			if(tree[j].i<=taxon){
 				int i = tree[j].i;
 				int father=tree[j].j; 
 				
-				Tau[i][i]=0; 
-				Tau[i][0]=0; 
+				Tau[i][i]=0; // Modified 2/6/2009 - rimodificato il 29/9/2020
+				Tau[i][0]=0; // modificato il 29/9/2020
 
 				M[father-n][4]=1; M[father-n][5]=i; M[father-n][6]=0; 
 				CurrentNode=father; 
@@ -187,11 +200,13 @@ public:
 								CurrentNode=VisitedNode;
 							}
 							else{    
+								 // Modified 2/6/2009 - rimodificato il 29/9/2020
 								 	Tau[i][VisitedNode]=M[CurrentNode-n][4]+1;	
 								 	if(Tau[i][VisitedNode]>Tau[i][0]){
 								 		Tau[i][0] = Tau[i][VisitedNode];        
 								 		if (Tau[i][0] > Tau[0][0]) Tau[0][0] = Tau[i][0];
 								 	} 
+								 // End Modified 2/6/2009 - 29/9/2020
 								 if(obj_rescaling) len+=dist[i][VisitedNode]*precomputedpow[n]/precomputedpowRes[Tau[i][VisitedNode]];              //pow(2.0,(double)Tau[i][VisitedNode]/n);
 								 else len+=dist[i][VisitedNode]*precomputedpow[n-Tau[i][VisitedNode]]; 
 								  	
@@ -241,6 +256,8 @@ public:
 		double bme_length=0.0;
 		for(int i=1;i<=n;i++) bme_length+=external_edge_weight(i);
 		for(int i=n+1;i<=2*n-2;i++)for(int j=i+1;j<=2*n-2;j++) bme_length+=internal_edge_weight(i,j);
+		//bme_length*=pow(2,n);
+		//cout << "BME length of the final primal solution = " << bme_length/4 << endl;
 	}	
 
 	void OutputSpectralAnalysis(vector <vector <struct EDGE> > tree_list, double **dist){

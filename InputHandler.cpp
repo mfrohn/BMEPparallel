@@ -107,11 +107,11 @@ void InputHandler::EntropyAnalysis(int n, double ** &dist, bool DSrescaling){
 		double **d=new double*[n+1]; for(register unsigned int i=0; i<=n; i++) {d[i] = new double[n+1]; d[i][i]=0;}
 		DoubleStochasticRescaling(n,d,dist);
 		//now d is the double stochastic form of dist
-		//cout<<"Printing rescaled matrix..."<<endl;
-		//Print(d,n,n);
+		cout<<"Printing rescaled matrix..."<<endl;
+		Print(d,n,n);
 		//for(register unsigned int i=1; i<=n; i++){double sum=0.0; for(register unsigned int j=1; j<=n; j++) sum+=pow(2.0,-d[i][j]); cout << sum << endl;}
-		//cout<<"Printing original matrix..."<<endl;
-		//Print(dist,n,n);
+		cout<<"Printing original matrix..."<<endl;
+		Print(dist,n,n);
 		double alpha=0.0; double max_alpha = 1.0; double TOLL = 0.000001;
 		double *d_alpha=new double[n+1]; 
 		int *pi=new int[n+1];
@@ -317,8 +317,9 @@ void InputHandler::ReadDistanceMatrix(char * const fullnamefile, string &namefil
 		if(readingPattern==2)
 			for(register unsigned int i=0;i<N;i++) {
 				getline(in,line); ostringstream ss; ss << line;
-				int p=0; while(ss.str()[p]!=' ') p++; 
-				taxa_names.insert(make_pair(ss.str().substr(0,p),i+1)); 
+				int p=0; while(ss.str()[p]!=' ') p++; //cout << ss.str()[p++]; cout << endl;
+				taxa_names.insert(make_pair(ss.str().substr(0,p),i+1)); //cout << ss.str().substr(0,p) << endl;
+				//cout << "insert " << ss.str().substr(0,p) << " at pos " << taxa_names[ss.str().substr(0,p)] << endl;
 				for(register unsigned int j=0; j<N; j++){
 					while(ss.str()[++p]==' ') continue;
 					string entry; while((p<ss.str().length())&&(ss.str()[p]!=' ')) entry.append(1,ss.str()[p++]);
@@ -464,6 +465,7 @@ void InputHandler::ReadPrimalSolution(char * const fullnamefile, string &namefil
 
 	if(Optimum.tree.size()!=(2*n-3)) cout<<"\x1b[91m Error: Read "<<Optimum.tree.size()<<" out of the required total of "<< (2*n-3)<<" edges.\x1b[0m"<<endl;
 	
+	//for(int i=0;i<Optimum.tree.size();i++)cout<<"("<<Optimum.tree[i].i<<","<<Optimum.tree[i].j<<")"<<endl;
 	cout<<"The processing of "<<"\x1b[92m"<<namefile<<"\x1b[0m is completed."<<endl<<endl;
 }
 

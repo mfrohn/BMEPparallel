@@ -44,13 +44,14 @@ private:
 	double KraftLowerBound();
 	double PardiLowerBound(int);
 	double PardiGammaLowerBound(int);
+	//double LinLog(int);
 	bool Pruned(int, int, double);
 	bool Push(int, int, int);
 	void UpdateOptimum();
-	void UpdateOptimum2(bool);
 	void SetStartingTree();
 	void ShortcutTree_and_reorder_Taxa();
 	void PrintTree();
+	// void PrintM();
 	void NNISwap(int, int, int, int);
 	void NNI(int,bool);
 
@@ -59,6 +60,7 @@ public:
 	void SetNode_and_Run(NODE *node);
 	void SetPrimal_and_Taxa_Order();
 	void SetLower_Bounds(int);
+	// variables for PrimalDualLB
 	int n_rows_con_eq, n_cols_con_eq;
 	double **constraints_eq;
 	double *dual_vars;
@@ -70,6 +72,7 @@ public:
 	void NJtree();
 	void SWAA();
 	void SWAA2();
+	// void SetStartingQueue(int taxon,int edge_cardinality);
 	Solver(){}
 	Solver(int CoreNum,int taxa,int boundtype){
 		Core=CoreNum; 
@@ -119,6 +122,7 @@ public:
 	  	for(register unsigned int i=1; i<=n; i++) {for(register unsigned int j=i+1; j<=n; j++) delete [] dual_gaps[i][j];  delete [] dual_gaps[i];}  delete [] dual_gaps;
 	  	for(register unsigned int i=1; i<=n; i++) {for(register unsigned int j=i+1; j<=n; j++) delete [] primal_vars[i][j];  delete [] primal_vars[i];}  delete [] primal_vars;
 	  }
+	  // for(register unsigned int i=0; i<=n; i++){for(register unsigned int j=0; j<=n; j++) delete [] DistTaxon[i][j]; delete [] DistTaxon[i];} delete [] DistTaxon; 
 	 }
 };
 
@@ -171,14 +175,14 @@ void Solver::ComputeTopologicalMatrix(int taxon){
 	}
 	register int CurrentNode,VisitedNode; 
 	len=0;
-	Tau[0][0] = 0; 
+	Tau[0][0] = 0; // Modified 2/6/2009
 	for(int j=0; j<tsize; j++){
 		if(tree[j].i<=taxon){
 			int i = tree[j].i;
 			int father=tree[j].j; 
 			
-			Tau[i][i]=0; 
-			Tau[i][0]=0; 
+			Tau[i][i]=0; // Modified 2/6/2009 - rimodificato il 29/9/2020
+			Tau[i][0]=0; // modificato il 29/9/2020
 
 			M[father-n][4]=1; M[father-n][5]=i; M[father-n][6]=0; 
 			CurrentNode=father; 
@@ -193,11 +197,13 @@ void Solver::ComputeTopologicalMatrix(int taxon){
 							CurrentNode=VisitedNode;
 						}
 						else{    
+							 // Modified 2/6/2009 - rimodificato il 29/9/2020
 							 	Tau[i][VisitedNode]=M[CurrentNode-n][4]+1;	
 							 	if(Tau[i][VisitedNode]>Tau[i][0]){
 							 		Tau[i][0] = Tau[i][VisitedNode];        
 							 		if (Tau[i][0] > Tau[0][0]) Tau[0][0] = Tau[i][0];
 							 	} 
+							 // End Modified 2/6/2009 - 29/9/2020
 							 if(obj_rescaling) len+=dist[i][VisitedNode]*precomputedpow[n]/precomputedpowRes[Tau[i][VisitedNode]];
 							 else len+=dist[i][VisitedNode]*precomputedpow[n-Tau[i][VisitedNode]]; 
 							  	
@@ -230,6 +236,8 @@ void Solver::ComputeWeightedOptimalTopologicalMatrix(){
 		if (temp1 <= n) edgeweights[temp1][1]=Optimum.tree[e].weight;
 		if (temp2 <= n) edgeweights[temp2][1]=Optimum.tree[e].weight;
 	}
+	//for(register unsigned int i=1; i<=2*n-2;  i++)
+	//	cout << edgeweights[i][1] << " " << edgeweights[i][2] << " " << edgeweights[i][3] << endl;
 	register int CurrentNode,VisitedNode;
 	for(int e=0; e<tsize; e++){
 		bool process=false; int i, father;
@@ -253,11 +261,13 @@ void Solver::ComputeWeightedOptimalTopologicalMatrix(){
 					M[CurrentNode-n][6]++; VisitedNode=M[CurrentNode-n][(int)M[CurrentNode-n][6]];
 					if (VisitedNode != M[CurrentNode-n][5]){
 						if (VisitedNode > n){ // if neighbour of CurrentNode is internal
+							//cout << "set path length from " << i << " to " << VisitedNode << " = " << M[CurrentNode-n][4] << " + " << edgeweights[CurrentNode][(int)M[CurrentNode-n][6]] << endl;
 							M[VisitedNode-n][4]=M[CurrentNode-n][4]+edgeweights[CurrentNode][(int)M[CurrentNode-n][6]];
 							M[VisitedNode-n][5]=CurrentNode;
 							M[VisitedNode-n][6]=0;
 							CurrentNode=VisitedNode;
 						} else // neighbour of CurrentNode is external
+							//cout << "set path length from " << i << " to " << VisitedNode << " = " << M[CurrentNode-n][4] << " + " << edgeweights[VisitedNode][1] << endl;
 							Wtau[i][VisitedNode]=M[CurrentNode-n][4]+edgeweights[VisitedNode][1];	
 					}
 				} else{ // continue recursion
@@ -267,6 +277,7 @@ void Solver::ComputeWeightedOptimalTopologicalMatrix(){
 			}
       	}
     }
+    //for(int i=1; i<=n;i++){for(int j=1; j<=n;j++) cout << Wtau[i][j] << " ";cout << endl;}
     for(register unsigned int i=0; i<=2*n-2; i++) delete [] edgeweights[i]; delete [] edgeweights;
     cout<<"done!"<<endl;  	
 }
@@ -420,6 +431,452 @@ void Solver::LoadProblem2(){
 	Third2=problem2.newCtr(TC3 == (2*n-3)*precomputedpow[n]);
 }
 
+void Solver::PrimalDualLB(){
+	// Kraft constraints
+	int start=0;
+	for(int h=1; h<=n-1; h++){
+		for(int i=1; i<=n; i++)
+			for(int j=1+start; j<=(n-2)*(n-h)+start; j++)
+				if(i==h) constraints_eq[i][j] = 1;
+				else if((i>h)&&(j>=(i-h-1)*(n-2)+1+start)&&(j<=(i-h)*(n-2)+start)) constraints_eq[i][j] = 1;
+		start+=(n-2)*(n-h);}
+	// phylogenetic manifold constraint
+	for(int j=1; j<=n_cols_con_eq; j++) constraints_eq[n+1][j] = 1;
+	// convexity constraints
+	for(int i=2+n; i<=n*(n-1)/2+n+1; i++)
+		for(double j=1; j<=n_cols_con_eq; j++){
+			int idx = ceil(j/(n-2));
+			if(i-n-1==idx) constraints_eq[i][(int)j] = 1;}
+	// set proper coefficients
+	for(double j=1.0; j<=n_cols_con_eq; j++){
+		int ell = j+1-floor((j-1)/(n-2))*(n-2);
+		for(int i=1; i<=n; i++) constraints_eq[i][(int)j] *= pow(2.0,1-ell);
+		constraints_eq[n+1][(int)j] *= ell*pow(2.0,-ell)/(2*n-3);}
+	// Print constraints
+	/*for(int i=1; i<=n_rows_con_eq; i++){
+		for(int j=1; j<=n_cols_con_eq; j++) cout << setprecision(2) << constraints_eq[i][j] << " ";
+		cout << endl;
+	}*/
+	// INITIALIZATION
+	// dual_vars[1..n] = mu, dual_vars[n+1] = nu, dual_vars[n+2...n_rows_con_eq] = lambda
+	cout << "initialize dual variables:" << endl;
+	//for(int i=1; i<=n-1; i++)for(int j=i+1; j<=n; j++) dist[i][j] *= pow(10,6);
+	// set nu
+	dual_vars[n+1] = INF;
+	for(int i=1; i<=n-1; i++)for(int j=i+1; j<=n; j++)
+		if(dist[i][j]*(2*n-3)/(n-1)<dual_vars[n+1]) dual_vars[n+1] = dist[i][j]*(2*n-3)/(n-1);
+	dual_vars[n+1] = 0;
+	cout << "nu:" << endl << dual_vars[n+1] << endl;
+	// set mu
+	cout << "mu:" << endl;
+	for(int i_hat=1; i_hat<=n; i_hat++){
+		dual_vars[i_hat]=INF; 
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++)
+				for(int ell=2; ell<=n-1; ell++)
+					if((i==i_hat)&&(dist[i][j]-ell*dual_vars[n+1]/(2*n-3) < dual_vars[i_hat])) 
+						dual_vars[i_hat]=dist[i][j]-ell*dual_vars[n+1]/(2*n-3);
+					else if ((j==i_hat)&&(dist[i][j]-ell*dual_vars[n+1]/(2*n-3)-dual_vars[i] < dual_vars[i_hat])) 
+						dual_vars[i_hat]=dist[i][j]-ell*dual_vars[n+1]/(2*n-3)-dual_vars[i];
+		//dual_vars[i_hat]=0;
+		cout << dual_vars[i_hat] << endl;
+	}
+	// set lambda
+	cout << "lambda:" << endl;
+	int sum=n+1; for(int i=1; i<=n-1; i++){ for(int j=i+1; j<=n; j++){
+			dual_vars[sum+j-i] = (dist[i][j]-(n-1)*dual_vars[n+1]/(2*n-3)-dual_vars[i]-dual_vars[j])*pow(2.0,2-n);
+			cout << dual_vars[sum+j-i] << endl;
+		}
+	sum += n-i;}	
+	double sum_d = 0.0; for(int i=1; i<=n_rows_con_eq;i++) sum_d+=dual_vars[i];
+	cout << "-> dual objective function value: " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+	
+	
+	/*int max_mu_idx=1, min_mu_idx=1;
+	for(int i=2; i<=n; i++){
+		if(dual_vars[i]>dual_vars[max_mu_idx]) max_mu_idx = i;
+		if(dual_vars[i]<dual_vars[min_mu_idx]) min_mu_idx = i;
+	}
+	double rebalance = (dual_vars[max_mu_idx]+dual_vars[min_mu_idx])/2;
+	for(int i=1; i<=n; i++) sum_d -= dual_vars[i];
+	dual_vars[max_mu_idx] = rebalance;
+	for(int i=1; i<=n; i++)
+		if((i!=max_mu_idx)&&(i!=min_mu_idx))
+			dual_vars[i] -= rebalance - dual_vars[min_mu_idx];
+	dual_vars[min_mu_idx] = rebalance;
+	for(int i=1; i<=n; i++) sum_d += dual_vars[i];*/
+	
+
+
+	double alpha_rate=0.000001; double alpha_max=0.5;
+	int counter=0;
+	/*int i_hat=1;
+	while(counter++<100){
+	// dual step: increase nu and decrease each mu_(i_hat) by the largest possible margin
+	double opt_alpha_inc, alpha_inc = alpha_rate, sum_n_d_max=0.0;
+	while(alpha_inc<=alpha_max){
+		double max_LB_beta=0.0;
+		sum=n+1; for(int i=1; i<=n; i++){
+			for(int j=i+1; j<=n; j++) for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = pow(2.0,ell-1)*dual_vars[sum+j-i]+dual_vars[i]+dual_vars[j]+(dual_vars[n+1]+alpha_inc)*ell/(2*n-3)-dist[i][j];
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			sum += n-i;
+		}
+		// check if the dual objective function value got improved
+		double sum_n_d = sum_d + alpha_inc - max_LB_beta*n/2;
+		if(sum_n_d > sum_n_d_max) {sum_n_d_max = sum_n_d; opt_alpha_inc = alpha_inc;}
+		// next alpha
+		alpha_inc+=alpha_rate;
+	}
+	//cout << sum_n_d_max << " | " << sum_d << endl;
+	if((sum_n_d_max>sum_d)&&(opt_alpha_inc>alpha_rate)){
+		// increase nu by opt_alpha_inc
+		dual_vars[n+1] += opt_alpha_inc; 
+		double max_LB_beta=0.0;
+		sum=n+1; for(int i=1; i<=n; i++){
+			for(int j=i+1; j<=n; j++) for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = pow(2.0,ell-1)*dual_vars[sum+j-i]+dual_vars[i]+dual_vars[j]+(dual_vars[n+1]+alpha_inc)*ell/(2*n-3)-dist[i][j];
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			sum += n-i;
+		}
+		// decrease mu_(i_hat) by the tightest feasibility bound on beta_(i_hat)
+		for(int i=1; i<=n; i++) dual_vars[i] -= max_LB_beta/2;
+		sum_d = sum_n_d_max; 
+		cout << "-> dual objective function value (nu += " << opt_alpha_inc << "; mu decreased): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+		// if there was an increase of nu, the descrease of mu_(i_hat) lead to more space for nu to increase independently
+		double max_nu=INF;
+		sum=n+1; for(int i=1; i<=n-1; i++){for(int j=i+1; j<=n; j++)
+		for(int ell=2; ell<=n-1; ell++){
+			double UB_nu = (dist[i][j]-pow(2.0,ell-1)*dual_vars[sum+j-i]-dual_vars[i]-dual_vars[j])*(2*n-3)/ell;
+			if(UB_nu < max_nu) max_nu = UB_nu;
+		}
+		sum += n-i;}
+		if(sum_d + max_nu - dual_vars[n+1] > sum_d){
+			sum_d += max_nu - dual_vars[n+1];
+			cout << "-> dual objective function value (nu += " << (max_nu - dual_vars[n+1]) <<  "): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+			dual_vars[n+1] = max_nu;
+		}
+	} else break;
+
+	}*/
+
+
+	/*counter=0;
+	while(counter++<100){
+	// dual step: increase nu and decrease all lambdas by the largest possible margin
+	double alpha_inc = alpha_rate;
+	double opt_alpha_inc, sum_n_d_max=0.0;
+	while(alpha_inc<=alpha_max){
+		double beta_sum=0.0;
+		sum=n+1; for(int i=1; i<=n-1; i++){ 
+			for(int j=i+1; j<=n; j++){
+				double max_LB_beta=0.0;
+				for(int ell=2; ell<=n-1; ell++){
+					double LB_beta = dual_vars[sum+j-i]+pow(2.0,1-ell)*(dual_vars[i]+dual_vars[j])+(dual_vars[n+1]+alpha_inc)*ell*pow(2.0,1-ell)/(2*n-3)-dist[i][j]*pow(2.0,1-ell);
+					if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+				beta_sum+=max_LB_beta;}
+			sum += n-i;}
+		// check if the dual objective function value got improved
+		double sum_n_d = sum_d + alpha_inc - beta_sum;
+		if(sum_n_d > sum_n_d_max) {sum_n_d_max = sum_n_d; opt_alpha_inc = alpha_inc;}
+		// next alpha
+		alpha_inc+=alpha_rate;
+	}
+	//cout << sum_n_d_max << " | " << sum_d << endl;
+	if((sum_n_d_max>sum_d)&&(opt_alpha_inc>alpha_rate)){
+		// increase nu by opt_alpha_inc
+		dual_vars[n+1] += opt_alpha_inc;
+		sum=n+1; for(int i=1; i<=n-1; i++){ 
+			for(int j=i+1; j<=n; j++){
+				double max_LB_beta=0.0;
+				for(int ell=2; ell<=n-1; ell++){
+					double LB_beta = dual_vars[sum+j-i]+pow(2.0,1-ell)*(dual_vars[i]+dual_vars[j])+dual_vars[n+1]*ell*pow(2.0,1-ell)/(2*n-3)-dist[i][j]*pow(2.0,1-ell);
+					if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+				// decrease lambda_ij by the tightest feasibility bound on beta_ij
+				dual_vars[sum+j-i] -= max_LB_beta;}
+			sum += n-i;}
+		sum_d = sum_n_d_max;
+		cout << "-> dual objective function value (nu += " << opt_alpha_inc << "; lambda decreased): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+		// if there was an increase of nu, the descrease of lambda_ij lead to more space for nu to increase independently
+		double max_nu=INF;
+		sum=n+1; for(int i=1; i<=n-1; i++){for(int j=i+1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++){
+				double UB_nu = (dist[i][j]-pow(2.0,ell-1)*dual_vars[sum+j-i]-dual_vars[i]-dual_vars[j])*(2*n-3)/ell;
+				if(UB_nu < max_nu) max_nu = UB_nu;
+			}
+		sum += n-i;}
+		//max_nu = floor(max_nu*pow(10,12))*pow(10,-12); // numerical correction
+		if(sum_d + max_nu - dual_vars[n+1] > sum_d){
+			sum_d += max_nu - dual_vars[n+1];
+			cout << "-> dual objective function value (nu += " << (max_nu - dual_vars[n+1]) <<  "): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+			dual_vars[n+1] = max_nu;
+		}
+	} else break;
+
+	}*/
+
+	int c=0; while(c++<10){
+	sum=n+1; for(int i=1; i<=n-1; i++){
+		for(int j=1; j<=n; j++) 
+			if(dual_vars[sum+i-j]>=0) dual_vars[sum+i-j] = 0;
+		sum += n-i;}
+
+	counter=0;
+	for(int i_hat=1; i_hat<=n; i_hat++) while(counter++<100){
+		//if(((i_hat==1)&&(c==2))||((i_hat==n)&&(c==2))) break;
+	// dual step: increase mu_(i_hat) and decrease all lambdas by the largest possible margin
+	double opt_alpha_inc, alpha_inc = alpha_rate, sum_n_d_max=0.0;
+	while(alpha_inc<=alpha_max){
+		double beta_sum=0.0;
+		sum=n+1; for(int j=1; j<=i_hat-1; j++){
+			double max_LB_beta=0.0;
+			for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = dual_vars[sum+i_hat-j]+pow(2.0,1-ell)*(dual_vars[i_hat]+alpha_inc+dual_vars[j])+dual_vars[n+1]*ell*pow(2.0,1-ell)/(2*n-3)-dist[j][i_hat]*pow(2.0,1-ell);
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			beta_sum+=max_LB_beta;
+			sum += n-j;
+		}
+		for(int j=i_hat+1; j<=n; j++){
+			double max_LB_beta=0.0;
+			for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = dual_vars[sum+j-i_hat]+pow(2.0,1-ell)*(dual_vars[i_hat]+alpha_inc+dual_vars[j])+dual_vars[n+1]*ell*pow(2.0,1-ell)/(2*n-3)-dist[i_hat][j]*pow(2.0,1-ell);
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			beta_sum+=max_LB_beta;
+		}
+		// check if the dual objective function value got improved
+		double sum_n_d = sum_d + alpha_inc - beta_sum;
+		if(sum_n_d > sum_n_d_max) {sum_n_d_max = sum_n_d; opt_alpha_inc = alpha_inc;}
+		// next alpha
+		alpha_inc+=alpha_rate;
+	}
+	if((sum_n_d_max>sum_d)&&(opt_alpha_inc>alpha_rate)){
+		// increase mu_(i_hat) by opt_alpha_inc
+		dual_vars[i_hat] += opt_alpha_inc; 
+		sum=n+1; for(int j=1; j<=i_hat-1; j++){
+			double max_LB_beta=0.0;
+			for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = dual_vars[sum+i_hat-j]+pow(2.0,1-ell)*(dual_vars[i_hat]+dual_vars[j])+dual_vars[n+1]*ell*pow(2.0,1-ell)/(2*n-3)-dist[j][i_hat]*pow(2.0,1-ell);
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			// decrease lambda_ij by the tightest feasibility bound on beta_ij
+			dual_vars[sum+i_hat-j] -= max_LB_beta;
+			sum += n-j;
+		}
+		for(int j=i_hat+1; j<=n; j++){
+			double max_LB_beta=0.0;
+			for(int ell=2; ell<=n-1; ell++){
+				double LB_beta = dual_vars[sum+j-i_hat]+pow(2.0,1-ell)*(dual_vars[i_hat]+dual_vars[j])+dual_vars[n+1]*ell*pow(2.0,1-ell)/(2*n-3)-dist[i_hat][j]*pow(2.0,1-ell);
+				if(LB_beta>max_LB_beta) max_LB_beta = LB_beta;}
+			// decrease lambda_ij by the tightest feasibility bound on beta_ij
+			dual_vars[sum+j-i_hat] -= max_LB_beta;
+		}
+		sum_d = sum_n_d_max; 
+		cout << "-> dual objective function value (mu_"<<i_hat<<" += " << opt_alpha_inc << "; lambda decreased): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+			// if there was an increase of mu_i, the descrease of lambda_ij lead to more space for mu_i to increase independently
+			double max_mu=INF;
+			sum=n+1; for(int j=1; j<=i_hat-1; j++){
+				for(int ell=2; ell<=n-1; ell++){
+					double mu = dist[j][i_hat]-pow(2.0,ell-1)*dual_vars[sum+i_hat-j]-dual_vars[j]-ell*dual_vars[n+1]/(2*n-3);
+					if(mu < max_mu) max_mu = mu;}
+				sum += n-j;
+			}
+			for(int j=i_hat+1; j<=n; j++)
+				for(int ell=2; ell<=n-1; ell++){
+					double mu = dist[i_hat][j]-pow(2.0,ell-1)*dual_vars[sum+j-i_hat]-dual_vars[j]-ell*dual_vars[n+1]/(2*n-3);
+					if(mu < max_mu) max_mu = mu;}
+			
+			if(sum_d + max_mu - dual_vars[i_hat] > sum_d){
+				sum_d += max_mu - dual_vars[i_hat];
+				cout << "-> dual objective function value (mu_"<<i_hat<<" += " << (max_mu - dual_vars[i_hat]) <<  "): " << sum_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_d << ")" << endl << endl;
+				dual_vars[i_hat] = max_mu;
+			}
+	} else break;
+
+	}
+
+	
+	// nu
+	cout << "nu:" << endl << dual_vars[n+1] << endl;
+	// mu
+	cout << "mu:" << endl;
+	for(int i_hat=1; i_hat<=n; i_hat++) cout << dual_vars[i_hat] << endl;
+	// lambda
+	cout << "lambda:" << endl;
+	sum=n+1; for(int i=1; i<=n-1; i++){ for(int j=i+1; j<=n; j++)
+			cout << dual_vars[sum+j-i] << endl;
+	sum += n-i;}
+		
+
+	double sum_n_d=0.0; for(int i=1; i<=n_rows_con_eq; i++) sum_n_d+=dual_vars[i];
+	cout << "-> dual objective function value " << sum_n_d << " (dual gap = " << StatsArray[0].LPRootLB*pow(2.0,-n)-sum_n_d << ")" << endl << endl;
+	
+	}
+
+	sum=n+1;
+	for(int i=1; i<=n-1; i++){
+		for(int j=i+1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++)
+				cout << "2^" << ell << " * " << dual_vars[sum+j-i] << "+2(" << dual_vars[i] 
+					 << "+" << dual_vars[j] << ")+2*" << ell << "/(2n-3) * " << dual_vars[n+1]
+					 << " | " << 2*dist[i][j]-pow(2.0,ell)*dual_vars[sum+j-i]-2*(dual_vars[i]+dual_vars[j])-2*ell*dual_vars[n+1]/(2*n-3) << endl;
+		sum += n-i;
+	}
+
+	sum=n+1;
+	for(int i=1; i<=n-1; i++){
+		for(int j=i+1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++)
+				if(2*dist[i][j]-pow(2.0,ell)*dual_vars[sum+j-i]-2*(dual_vars[i]+dual_vars[j])-2*ell*dual_vars[n+1]/(2*n-3)==0){
+					cout << "mu_" << i << " = " << dual_vars[i] << " vs. mu_" << j << " = " << dual_vars[j] << endl; 
+				}
+		sum += n-i;
+	}
+
+
+	/*int counter=0;
+	while(counter++<10){
+		cout << setprecision(10) << "dual gaps in step " << counter << ":" << endl;*/
+		/*for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				for(int ell=2; ell<=n-1; ell++) cout << setprecision(10) << dual_gaps[i][j][ell] << " ";
+				cout << endl;
+			}*/
+		// DUAL STEP
+		// find minimum violated Kraft equality
+		/*double min=INF; int i_hat=-1;
+		for(int i=1; i<=n; i++){
+			double sum=0.0;
+			for(int j=1; j<=n; j++)
+				for(int ell=2; ell<=n-1; ell++){
+					if(i<j) sum += pow(2.0,1-ell)*primal_vars[i][j][ell];
+					if(i>j) sum += pow(2.0,1-ell)*primal_vars[j][i][ell];
+				}
+			if(abs(sum-1)<min) {min = abs(sum-1); i_hat=i;}
+		}
+		cout << endl << "minimum violated Kraft equality: " << i_hat << endl;*/
+		// find minimum epsilon
+		/*double min_eps=INF; sum=n+1;
+		for(int i=1; i<=n-1; i++){
+			for(int j=i+1; j<=n; j++)
+				for(int ell=2; ell<=n-1; ell++)
+					if(primal_vars[i][j][ell]==0){
+						double eps = dist[i][j] - dual_vars[sum+j-i]*pow(2.0,ell) - 2*(dual_vars[i]+dual_vars[j]) - dual_vars[n+1]*ell/(2*n-3);
+						if(eps<min_eps) min_eps = eps;
+					}
+			sum += n-i;
+		}
+		cout << endl << "minimum epsilon for inactive inequalities: " << min_eps << endl;
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				for(int ell=2; ell<=n-1; ell++) cout << dual_gaps[i][j][ell] << " ";
+				//if((i==i_hat)||(j==i_hat)) cout << "*" << endl; else 
+				cout << endl;
+			}*/
+		// find the minimum dual gap
+		/*min=INF; int min_j=-1;
+		for(int j=1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++){
+				if((i_hat<j)&&(dual_gaps[i_hat][j][ell]>0)&&(dual_gaps[i_hat][j][ell]<min)) {min=dual_gaps[i_hat][j][ell]; min_j=j;}
+				if((i_hat>j)&&(dual_gaps[j][i_hat][ell]>0)&&(dual_gaps[j][i_hat][ell]<min)) {min=dual_gaps[j][i_hat][ell]; min_j=j;}
+			}
+		cout << endl << "minimum dual gap: " << min << endl;*/
+		// increase mu_{i_hat} until at least one new dual constraints is active
+		/*dual_vars[i_hat] += min/2;
+		for(int j=1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++){
+				if(i_hat<j) dual_gaps[i_hat][j][ell] -= min;
+				if(i_hat>j) dual_gaps[j][i_hat][ell] -= min;
+				//if(i_hat<j) {cout << setprecision(4) << ell << " | " << dual_gaps[i_hat][j][ell]; dual_gaps[i_hat][j][ell] -= min; cout << " | " << dual_gaps[i_hat][j][ell] << endl;}
+				//if(i_hat>j) {cout << setprecision(4) << ell << " | " << dual_gaps[j][i_hat][ell]; dual_gaps[j][i_hat][ell] -= min; cout << " | " << dual_gaps[j][i_hat][ell] << endl;}		
+			} 
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				for(int ell=2; ell<=n-1; ell++) cout << dual_gaps[i][j][ell] << " ";
+				if((i==i_hat)||(j==i_hat)) cout << "*" << endl; else cout << endl;
+			}
+		// increase lambda_{i_hat,j} until all dual gaps are non-negative
+		sum=0; for(int i=1; i<=i_hat-1; i++) sum += n-i;
+		for(int j=1; j<=n; j++) if(j!=min_j){
+			min=0.0; for(int ell=2; ell<=n-1; ell++){
+				if((i_hat<j)&&(dual_gaps[i_hat][j][ell]*pow(2.0,-ell)<min)) min=dual_gaps[i_hat][j][ell]*pow(2.0,-ell);
+				if((i_hat>j)&&(dual_gaps[j][i_hat][ell]*pow(2.0,-ell)<min)) min=dual_gaps[j][i_hat][ell]*pow(2.0,-ell);
+			}
+			for(int ell=2; ell<=n-1; ell++){
+				if(i_hat<j) dual_gaps[i_hat][j][ell] -= min*pow(2.0,ell);
+				if(i_hat>j) dual_gaps[j][i_hat][ell] -= min*pow(2.0,ell);
+			}
+			if(i_hat<j) dual_vars[sum+j-i_hat] += min;
+			if(i_hat>j) dual_vars[sum+j-i_hat] += min;
+		}*/
+		/*for(int j=1; j<=n; j++)
+			for(int ell=2; ell<=n-1; ell++){
+				if(i_hat<j) {cout << setprecision(4) << ell << " | " << dual_gaps[i_hat][j][ell] << endl; }
+				if(i_hat>j) {cout << setprecision(4) << ell << " | " << dual_gaps[j][i_hat][ell] << endl;}		
+			}*/ 
+		/*cout << endl << "updated lambda" << endl;
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				for(int ell=2; ell<=n-1; ell++) cout << dual_gaps[i][j][ell] << " ";
+				if((i==i_hat)||(j==i_hat)) cout << "*" << endl; else cout << endl;
+			}*/
+		// increase all dual variables by min_eps
+		/*for(int i=1; i<=n_rows_con_eq; i++) dual_vars[i] += min_eps;
+		for(int i=1; i<=n_rows_con_eq; i++)
+			cout << dual_vars[i] << endl;
+		// update all dual gaps
+		sum=n+1;
+		for(int i=1; i<=n-1; i++){
+			for(int j=i+1; j<=n; j++)
+				for(int ell=2; ell<=n-1; ell++)
+					dual_gaps[i][j][ell] = dist[i][j] - dual_vars[sum+j-i]*pow(2.0,ell) - 2*(dual_vars[i]+dual_vars[j]) - dual_vars[n+1]*ell/(2*n-3);
+			sum += n-i;
+		}*/
+		// update lambda
+		/*sum=n+1;
+		for(int i=1; i<=n-1; i++){
+			for(int j=i+1; j<=n; j++) {
+				double min=INF; int opt_ell=-1;
+				for(int ell=2; ell<=n-1; ell++)
+					if(dual_gaps[i][j][ell]*pow(2.0,-ell)<min){min = dual_gaps[i][j][ell]*pow(2.0,-ell); opt_ell=ell;}
+				dual_vars[sum+j-i] += min;//dist[i][j]/4 - min_d[i]/8 - min_d[j]/8;
+				for(int ell=2; ell<=n-1; ell++) dual_gaps[i][j][ell] -= min*pow(2.0,ell);
+			}
+			sum += n-i;
+		}*/
+		/*cout << endl << "dual variable += epsilon: " << min_eps << endl;
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				for(int ell=2; ell<=n-1; ell++) cout << dual_gaps[i][j][ell] << " ";
+				//if((i==i_hat)||(j==i_hat)) cout << "*" << endl; else 
+				cout << endl;
+			}
+		// PRIMAL STEP
+		cout << "primal solution: " << endl; 
+		for(int i=1; i<=n-1; i++)
+			for(int j=i+1; j<=n; j++){
+				double min=INF;
+				for(int ell=2; ell<=n-1; ell++){
+					if(dual_gaps[i][j][ell]<min) min = dual_gaps[i][j][ell];*/
+					//primal_vars[i][j][ell] = 1.0/(n-2);
+					//cout << primal_vars[i][j][ell] << " | " << dual_gaps[i][j][ell] << endl;
+					/*if(dual_gaps[i][j][ell]==0){//&&(2*dist[i][j]!=min_d[i]+min_d[j]))
+						primal_vars[i][j][ell] = 1; 
+					//else if(dual_gaps[i][j][ell]==0) 
+					//	primal_vars[i][j][ell] = 1.0/(n-2);
+					} else
+						primal_vars[i][j][ell] = 0;*/
+					//cout << setprecision(5) << primal_vars[i][j][ell] << " ";
+				//}
+				/*for(int ell=2; ell<=n-1; ell++){
+					if(dual_gaps[i][j][ell]==min) primal_vars[i][j][ell] = 1; 
+					else primal_vars[i][j][ell] = 0; 
+					cout << setprecision(5) << primal_vars[i][j][ell] << " ";
+				}
+				cout << endl;
+			}
+		cout << endl;
+	}*/
+}
+
 double Solver::EntropyBound(int n, int taxon, double * &d){
 	if(n==taxon){
 		double sum=0.0;
@@ -448,6 +905,8 @@ double Solver::EntropyBound(int n, int taxon, double * &d){
 	
 // Assumption: dist is not doubly-stochastic, matrix Tau is well-defined
 void Solver::EntropyAnalysis(int taxon){
+	//cout << "start entropy analysis for taxon " << taxon << " with Tau matrix " << endl;
+	//for(int i=1; i<=taxon; i++){ for(int j=1; j<=taxon; j++) cout << Tau[i][j] << " "; cout << endl;}
 	double *d_alpha=new double[n+1]; 
 	int *pi=new int[n+1];
 	int *pi2=new int[n+1];
@@ -476,15 +935,32 @@ void Solver::EntropyAnalysis(int taxon){
 			double value = alpha_sigma[min]; int idx = pi2[min];
 			while(min > i){alpha_sigma[min]=alpha_sigma[min-1]; pi2[min]=pi2[min-1]; min--;}
 			alpha_sigma[i]=value; pi2[i]=idx;}
+		//cout << "sorted alpha_sigma for taxon " << taxon << endl;
+		//for(int i=1; i<=taxon; i++) cout << alpha_sigma[i] << " "; cout << endl;
 		// calculate the entropy lower bound
 		entropybound += EntropyBound(n,taxon,d_alpha);
+		//cout << "sorted alpha_sigma after entropy calculations " << endl;
+		//for(int i=1; i<=n; i++) cout << alpha_sigma[i] << " "; cout << endl;
+		//cout << "the entropy lower bound for row " << k << " is: " << entropy_bound << endl;
 		// reverse sort
 		for(register unsigned int j=1; j<=n; j++) sigma[k][pi[j]] = alpha_sigma[j];
+		//cout << "sigma after entropy calculations " << endl;
+		//for(int i=1; i<=n; i++) cout << sigma[k][i] << " "; cout << endl;
+		/*for(register unsigned int j=1; j<=n; j++) cout << pi[j] << " "; cout << endl;
+		for(register unsigned int j=1; j<=n; j++) cout << d_alpha[j] << " "; cout << endl;
+		for(register unsigned int j=1; j<=n; j++) cout << alpha_tau[j] << " "; cout << endl;*/
+		//for(register unsigned int j=1; j<=n; j++) cout << sigma[k][j] << " "; cout << endl;
 	}
+	//cout << "the entropy lower bound is: " << entropybound << endl;
 	entropybound+=opt_alpha*(3*n-6);
 	entropybound/=2;
 	if(entropybound>opt_entropybound) opt_entropybound=entropybound;
 	opt_entropybound*=precomputedpow[n];
+	/*for(register unsigned int i=1; i<=n;i++){
+		for(register unsigned int j=1; j<=n;j++)
+			cout << sigma[i][j] << " "; 
+		cout << endl;
+	}*/
 	delete [] pi; delete [] pi2; delete [] d_alpha; for(register unsigned int i=1; i<=n;i++) delete [] sigma[i]; delete [] sigma;
 }
 
@@ -560,17 +1036,22 @@ double Solver::LagrangianDualLowerBound(int taxon){
 
 
 double Solver::FastLinearProgrammingLowerBound(int taxon){
+	// Eq 13
 	for(register unsigned int i=1; i<=taxon-1; i++){
 		for(register unsigned int j=i+1; j<=taxon; j++){
 			for(register unsigned int k=2; k<=Tau[i][j]-1; k++) path[i][j][k].setUB(0.0); 
 			for(register unsigned int k=(n-taxon)+Tau[i][j]+1; k<=n-1; k++) path[i][j][k].setUB(0.0); 
 		}
 	}
+	
+	// Eq 14
 	for(register unsigned int i=1; i<=taxon; i++){
 		for(register unsigned int j=taxon+1; j<=n; j++){
 			for(register unsigned int k=(n-taxon)+Tau[taxon][0]+1; k<=n-1; k++) path[i][j][k].setUB(0.0); 
 		}
 	}
+
+	// Eq 15
 	for(register unsigned int i=taxon+1; i<=n-1; i++){
 		for(register unsigned int j=i+1; j<=n;   j++){
 			for(register unsigned int k=(n-taxon)+Tau[0][0]+1; k<=n-1; k++) path[i][j][k].setUB(0.0); 
@@ -581,17 +1062,23 @@ double Solver::FastLinearProgrammingLowerBound(int taxon){
 	double LB=problem.getObjVal(); 
 	DualValuesAtLeaf[taxon][0]=Third.getDual(); 
 	for(register unsigned int i=1; i <= n; i++) DualValuesAtLeaf[taxon][i]=Kraft[i].getDual();
+
+	// Eq 13
 	for(register unsigned int i=1; i<=taxon-1; i++){
 		for(register unsigned int j=i+1; j<=taxon; j++){
 			for(register unsigned int k=2; k<=Tau[i][j]-1; k++) path[i][j][k].setUB(1.0); 
 			for(register unsigned int k=(n-taxon)+Tau[i][j]+1; k<=n-1; k++) path[i][j][k].setUB(1.0); 
 		}
 	}
+	
+	// Eq 14
 	for(register unsigned int i=1; i<=taxon; i++){
 		for(register unsigned int j=taxon+1; j<=n; j++){
 			for(register unsigned int k=(n-taxon)+Tau[taxon][0]+1; k<=n-1; k++) path[i][j][k].setUB(1.0); 
 		}
 	}
+
+	// Eq 15
 	for(register unsigned int i=taxon+1; i<=n-1; i++){
 		for(register unsigned int j=i+1; j<=n;   j++){
 			for(register unsigned int k=(n-taxon)+Tau[0][0]+1; k<=n-1; k++) path[i][j][k].setUB(1.0); 
@@ -601,6 +1088,15 @@ double Solver::FastLinearProgrammingLowerBound(int taxon){
 	return LB; 
 }
 
+/*double Solver::LinLog(int taxon){
+	double sum=0.0;
+	for(register unsigned int i=1; i<=taxon; i++){
+		for(register unsigned int j=i+1; j<=taxon; j++){
+			sum+=precomputedpow[n-Tau[i][j]]*(1-pow(2.0,-dist[i][j]));
+		}
+	}
+	return sum;
+}*/
 
 bool Solver::Pruned(int taxon, int selector, double bound){
 	double LowerBound=0; 
@@ -609,6 +1105,7 @@ bool Solver::Pruned(int taxon, int selector, double bound){
 				if(LowerBound > Optimum.tree_len) return true; 
 				break;
 		case 2:	EntropyAnalysis(taxon);
+				//if(opt_entropybound > Optimum.tree_len) return true;
 				if(!obj_rescaling){
 					StatsArray[Core].DualCounter++; 
 					if(eorder!=1) LowerBound=LagrangianDualLowerBound(taxon);
@@ -624,14 +1121,26 @@ bool Solver::Pruned(int taxon, int selector, double bound){
 }
 
 void Solver::Explore(int start, int end, int taxon){
+	/*#pragma omp critical
+    {
+    	cout << "Core "<<Core<<": " << taxon << " taxa inserted: Explore in (" << start << "," << end << ")" << endl;
+    }*/
 	double tmp_insertion_bound;
 	for(register unsigned int e=start; e<end; e++){
 		tmp_insertion_bound=tree[e].prio;
+		/*#pragma omp critical
+    	{
+    		cout << "add taxon "<<taxon<<endl;
+    	}*/
 	 	Add(taxon,e);
 	 	ComputeTopologicalMatrix(taxon);
 		StatsArray[Core].nodecounter++;
 		DFS(taxon,tmp_insertion_bound);
 		Restore(e);		
+		/*#pragma omp critical
+    	{
+    		cout << "remove taxon "<<taxon<<endl;
+    	}*/
 		tree[e].prio = tmp_insertion_bound;	
 	}	
 }
@@ -645,6 +1154,10 @@ void Solver::insertPartition(int taxon, double sep, int n_sep){
 			if(floor(n_sep*sep)+1<ceil((n_sep+1)*sep)){
 				while(!inserted_properly && !Out_of_Time())
 					inserted_properly=Push(floor(n_sep*sep)+1,ceil((n_sep+1)*sep)+shift,taxon);
+				/*#pragma omp critical
+    			{
+    				cout << "n_sep = " << n_sep << ", sep = "<<sep<<": "<< floor(n_sep*sep)+1 << " < " << ceil((n_sep+1)*sep)<<"; leads to "<<inserted_properly << endl;
+    			}*/
 			}
 			if(inserted_properly && n_sep>1) insertPartition(taxon,sep,n_sep-1);
 			else Explore(0,floor(n_sep*sep)+1,taxon+1);
@@ -781,6 +1294,9 @@ void Solver::DFS(int taxon, double bound){
 	}
     else if (!Pruned(taxon,boundtype,bound)){ 
     	// the relative size of the tree; might exclude edges
+    	/*cout << "current tree:" << endl;
+    	for(int e=0; e<(int)tree.size();e++)
+    		cout << "(" << tree[e].i << "," << tree[e].j << ")" << endl;*/
 		int rel_size=(int)tree.size();
 		if(eorder==1) rel_size=LBEdgeOrder(taxon);
 		if(eorder==2) RandomizeEdgeOrder(taxon);
@@ -788,7 +1304,15 @@ void Solver::DFS(int taxon, double bound){
 	   		double sep = 1.0;
 	   		if(rel_size>=n_p+1){ // default: >= 4
 	   			sep = rel_size/(n_p*1.0); // sep = uniform size of partition sets (>= 2 by default)
+	   			/*#pragma omp critical
+    			{
+    				cout << "Calculated: rel_size = " << rel_size << ", sep = "<<sep << endl;
+    			}*/
 	   			if(sep>=s_p) insertPartition(taxon,sep,n_p-1);
+	   			/*#pragma omp critical
+    			{
+    				cout << "finished inserting partitions" << endl;
+    			}*/
 	   		} else if(s_p==1) insertPartition(taxon,sep,rel_size-1);
 	   		if((s_p>sep)&&(s_p<=floor(rel_size/2))){
 	   			int n_pe = floor(rel_size/(s_p*1.0));
@@ -814,7 +1338,10 @@ void Solver::UpdateOptimum(){
 		edge.j=tree[e].j;
 		Optimum.tree.push_back(edge);
 	} 
-	cout<<"* "
+	ComputeTopologicalMatrix(n);
+	if(PRINT_TAU){
+		for(int i=1;i<=n;i++){for(int j=1;j<=n;j++)cout << Tau[i][j] << " "; cout << endl;}
+		cout<<"* "
 			<<setw(numWidth2)<< setfill(separator)<<Optimum.OverallNumber_of_Primal_Solutions
 			<<setw(numWidth+PRECISION) << setfill(separator)<<std::setprecision(PRECISION)<<Optimum.tree_len<<std::setprecision(PRECISION)
 			<<setw(numWidth+PRECISION) << setfill(separator)<<std::scientific<<abs(Optimum.tree_len-StatsArray[0].RootLB)/Optimum.tree_len*100
@@ -823,37 +1350,13 @@ void Solver::UpdateOptimum(){
 			<<setw(numWidth) << setfill(separator)<<Queue.size()
 		    <<setw(numWidth) << setfill(separator)<<"no"
 			<<endl;		
-}
-
-void Solver::UpdateOptimum2(bool print_line){
-	lock_guard<mutex> lg(m); //blocking access to the optimum data...
-	Optimum.tree_len=len;
-	Optimum.primal_bound_list.push_back(Optimum.tree);
-	Optimum.OverallNumber_of_Primal_Solutions++;
-	Optimum.tree.clear();
-	EDGE edge;
-	register unsigned int tsize=tree.size();
-	for(register unsigned int e=0; e<tsize; e++){
-		edge.i=tree[e].i; 
-		edge.j=tree[e].j;
-		Optimum.tree.push_back(edge);
-	}	
-	if(print_line){
-		cout<<"* "
-			<<setw(numWidth2)<< setfill(separator)<<Optimum.OverallNumber_of_Primal_Solutions
-			<<setw(numWidth+PRECISION) << setfill(separator)<<std::setprecision(PRECISION)<<Optimum.tree_len<<std::setprecision(PRECISION)
-			<<setw(numWidth+PRECISION) << setfill(separator)<<std::scientific<<abs(Optimum.tree_len-StatsArray[0].RootLB)/Optimum.tree_len*100
-			<<setprecision(8)
-			<<setw(numWidth) << setfill(separator)<<std::fixed<<omp_get_wtime() - StatsArray[0].start_time
-			<<setw(numWidth) << setfill(separator)<<Queue.size()
-			<<setw(numWidth) << setfill(separator)<<"yes"
-			<<endl;
-	}		
+	}
 }
 
 
 /*NNI BLOCK*/
 void Solver::NNISwap(int node1, int node2, int node3, int node4){
+	// cout<<"swapping nodes "<<node1<<" and "<<node2<<" with "<<node3<<" and "<<node4<<endl;
 	register unsigned int tsize=tree.size();
 	for(register unsigned int e=0; e<tsize; e++){
 		if(tree[e].i==node1 && tree[e].j==node2) {tree[e].j=node4; if(tree[e].j < tree[e].i){int temp = tree[e].j; tree[e].j=tree[e].i; tree[e].i=temp;} break;}
@@ -867,6 +1370,7 @@ void Solver::NNISwap(int node1, int node2, int node3, int node4){
 
 
 void Solver::NNI(int taxon,bool flag){
+	// cout<<"In NNI..."<<endl;
 	register unsigned int tsize=tree.size();
 	vector<EDGE> temp_tree; 
 	EDGE f; for(register unsigned int e=0; e<tsize; e++){f.i=tree[e].i; f.j=tree[e].j; temp_tree.push_back(f);}
@@ -879,11 +1383,11 @@ void Solver::NNI(int taxon,bool flag){
 			for(register unsigned int k=1; k<=3; k++) if(M[tree[e].j-n][k]!=tree[e].i) {node[c]=M[tree[e].j-n][k]; c++;}
 			NNISwap(tree[e].i,node[2],tree[e].j,node[3]);
 			ComputeTopologicalMatrix(taxon);
-			if(Optimum.tree_len > len){UpdateOptimum2(flag);} 
+			if(Optimum.tree_len > len){UpdateOptimum();} // UpdateOptimum2(flag) 
 			tree.clear(); for(register unsigned int s=0; s<tsize; s++){f.i=temp_tree[s].i; f.j=temp_tree[s].j; tree.push_back(f);}
 			NNISwap(tree[e].i,node[2],tree[e].j,node[4]);
 			ComputeTopologicalMatrix(taxon);
-			if(Optimum.tree_len > len){UpdateOptimum2(flag);} 
+			if(Optimum.tree_len > len){UpdateOptimum();} // UpdateOptimum2(flag)
 			tree.clear(); for(register unsigned int s=0; s<tsize; s++){f.i=temp_tree[s].i; f.j=temp_tree[s].j; tree.push_back(f);}
 			ComputeTopologicalMatrix(taxon);
 		}
@@ -908,6 +1412,9 @@ void Solver::NJtree(){
 	tree.clear();
 
 	struct EDGE e; for(register unsigned int k=1;k<=n;k++){e.i=k;e.j=n+1;tree.push_back(e);}
+	
+	// cout<<"printing star tree..."<<endl;
+	// for(int e=0; e<tree.size(); e++) cout<<e<<": "<<tree[e].i<<" "<<tree[e].j<<endl;	
 
 	struct MINPOS{double value; int a; int i; int b; int j;	int idx;};
 	MINPOS min;
@@ -936,6 +1443,9 @@ void Solver::NJtree(){
 		tree.push_back(edge1);
 		tree.push_back(edge2);
 		tree.push_back(edge3);		
+
+		// cout<<"printing current tree..."<<endl;
+		// for(int e=0; e<tree.size(); e++) cout<<e<<": "<<tree[e].i<<" "<<tree[e].j<<endl;	
 
 		for(register unsigned int i=min.i; i<=n-k+4; i++) NJdist[0][i]=NJdist[0][i+1];
 		for(register unsigned int i=min.j-1; i<=n-k+4; i++) NJdist[0][i]=NJdist[0][i+1];
@@ -970,6 +1480,7 @@ void Solver::SWAA(){
 	 	}
         Add(k,pos); 
         cout<<setprecision(PRECISION);
+        //cout<<"Adding taxon "<<k<<" in edge "<<pos<<". Current length: "<<len<<endl;
 	}
 	ComputeTopologicalMatrix(n); 
 	cout<<"done! BME length of the SWA tree: "<<"\x1b[92m"<<len<<"\x1b[0m"<<endl;
@@ -994,6 +1505,7 @@ void Solver::SWAA2(){
 	 	}
         Add(k,pos); 
         cout<<setprecision(PRECISION);
+        //cout<<"Adding taxon "<<k<<" in edge "<<pos<<". Current length: "<<len<<endl;
 	}
 	ComputeTopologicalMatrix(n); 
 	cout<<"done! BME length of the 2nd SWA tree: "<<"\x1b[92m"<<len<<"\x1b[0m"<<endl;
@@ -1052,7 +1564,7 @@ void Solver::SetPrimal_and_Taxa_Order(){
 		// Greedy Agglo
 		NJtree();
 		if(Optimum.tree_len > len){
-			UpdateOptimum2(false);
+			UpdateOptimum(); // UpdateOptimum2(false)
 			cout<<"+The NJ-tree has a length shorter than the SWA's one. Updating primal bound..."<<endl;
 		}else{
 			cout<<"+Keeping the SWA tree as primal bound."<<endl;
@@ -1110,6 +1622,8 @@ void Solver::SetPrimal_and_Taxa_Order(){
 		delete [] pi;
 		// Calculate the length of the phylogeny based on its topology and the distance matrix
 		ComputeTopologicalMatrix(n);
+		//cout << "input tree length = " << input_length << endl;
+		//cout << "tree length derived from input topology = " << len << endl;
 		Optimum.tree_len=len;
 		Optimum.tree.clear();
 		for(register unsigned int e=0; e<(int)tree.size(); e++){
@@ -1167,9 +1681,24 @@ void Solver::SetLower_Bounds(int boundtype){
 		XPRSsetintcontrol(problem.getXPRSprob(), XPRS_BARTHREADS,1);
 		problem.setMsgLevel(0);
 
+	/*for(register unsigned int i=1; i<=n-1; i++){
+		cout << i << ": ";
+		for(register unsigned int j=i+1; j<=n; j++){
+			double sum = 0.0;
+			for(register unsigned int k=2; k<=n-1; k++){
+				cout << std::setprecision(6) << abs(path[i][j][k].getSol()) << " ";
+			}
+			cout << "| ";
+		}
+		cout << endl;
+	}*/
+
+
 		cout<<"done."<<endl;
 		StatsArray[0].LPRootLB=problem.getObjVal(); //Setting LP root LB
 		cout<<endl<<endl;  
+
+		//PrimalDualLB();
 
 	}
 	tree.clear();
@@ -1211,6 +1740,7 @@ bool Solver::Push(int start, int end, int taxon){
 				// random
 				case 4: srand(time(NULL)); node.prio=rand()%100; break;
 			}
+			//cout << "Core "<<Core<<": "<< "push taxon "<<node.taxon<<" in ("<<node.start_edge<<","<<node.end_edge<<")"<<endl;
 			Queue.push(node);
 			inserted_properly=true;
 		}	
